@@ -243,7 +243,12 @@ public class ScipDocumentIndexer
         if (!isDefinition) return;
 
         // Emit SymbolInformation for this definition occurrence.
-        var info = new SymbolInformation { Symbol = scipSymbol };
+        var info = new SymbolInformation 
+        { 
+            Symbol = scipSymbol,
+            DisplayName = GetDisplayName(symbol),
+            Kind = GetKind(symbol)
+        };
         _doc.Symbols.Add(info);
 
         var symbolSignature = symbol.ToDisplayString(_format);
@@ -376,5 +381,87 @@ public class ScipDocumentIndexer
                // The "global namespace" (parent of all namespaces) also has an empty name and should not
                // be treated as a local variable.
                (sym.Name.Equals("") && sym.Kind != SymbolKind.Namespace);
+    }
+
+    private static SymbolInformation.Types.Kind GetKind(ISymbol sym)
+    {
+        switch (sym.Kind)
+        {
+            case SymbolKind.Namespace:
+                return SymbolInformation.Types.Kind.Namespace;
+            case SymbolKind.NamedType:
+                if (sym is INamedTypeSymbol namedType)
+                {
+                    return namedType.TypeKind switch
+                    {
+                        TypeKind.Class => SymbolInformation.Types.Kind.Class,
+                        TypeKind.Struct => SymbolInformation.Types.Kind.Struct,
+                        TypeKind.Interface => SymbolInformation.Types.Kind.Interface,
+                        TypeKind.Enum => SymbolInformation.Types.Kind.Enum,
+                        TypeKind.Delegate => SymbolInformation.Types.Kind.Delegate,
+                        _ => SymbolInformation.Types.Kind.Type
+                    };
+                }
+                return SymbolInformation.Types.Kind.Type;
+            case SymbolKind.Method:
+                if (sym is IMethodSymbol method)
+                {
+                    return method.MethodKind switch
+                    {
+                        MethodKind.Constructor => SymbolInformation.Types.Kind.Constructor,
+                        MethodKind.StaticConstructor => SymbolInformation.Types.Kind.Constructor,
+                        _ => method.IsStatic ? SymbolInformation.Types.Kind.StaticMethod : SymbolInformation.Types.Kind.Method
+                    };
+                }
+                return SymbolInformation.Types.Kind.Method;
+            case SymbolKind.Property:
+                return sym.IsStatic ? SymbolInformation.Types.Kind.StaticProperty : SymbolInformation.Types.Kind.Property;
+            case SymbolKind.Field:
+                return sym.IsStatic ? SymbolInformation.Types.Kind.StaticField : SymbolInformation.Types.Kind.Field;
+            case SymbolKind.Event:
+                return sym.IsStatic ? SymbolInformation.Types.Kind.StaticEvent : SymbolInformation.Types.Kind.Event;
+            case SymbolKind.Parameter:
+                return SymbolInformation.Types.Kind.Parameter;
+            case SymbolKind.TypeParameter:
+                return SymbolInformation.Types.Kind.TypeParameter;
+            case SymbolKind.Local:
+                return SymbolInformation.Types.Kind.Parameter; // Closest match for local variables
+            case SymbolKind.FunctionPointerType:
+            case SymbolKind.ErrorType:
+            case SymbolKind.PointerType:
+            case SymbolKind.ArrayType:
+            case SymbolKind.DynamicType:
+            case SymbolKind.Alias:
+                return SymbolInformation.Types.Kind.Type;
+            default:
+                return SymbolInformation.Types.Kind.UnspecifiedKind;
+        }
+    }
+
+    private static string GetDisplayName(ISymbol sym)
+    {
+        // For most symbols, the Name property provides the display name
+        if (!string.IsNullOrEmpty(sym.Name))
+        {
+            return sym.Name;
+        }
+
+        // For special cases where Name might be empty or not descriptive
+        switch (sym.Kind)
+        {
+            case SymbolKind.Method when sym is IMethodSymbol method:
+                return method.MethodKind switch
+                {
+                    MethodKind.Constructor => ".ctor",
+                    MethodKind.StaticConstructor => ".cctor",
+                    MethodKind.Destructor => "Finalize",
+                    _ => sym.Name
+                };
+            case SymbolKind.Local:
+                // For local symbols, we might want to use a more descriptive name
+                return sym.Name ?? "local";
+            default:
+                return sym.Name ?? sym.ToString();
+        }
     }
 }
