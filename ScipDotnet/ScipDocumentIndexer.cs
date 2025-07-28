@@ -86,7 +86,7 @@ public class ScipDocumentIndexer
         }
 
         
-        var owner = (sym.ContainingSymbol is INamespaceSymbol namespaceSymbol &&
+        var owner = (sym is INamespaceSymbol namespaceSymbol &&
                       namespaceSymbol.IsGlobalNamespace)
             ? CreateScipPackageSymbol(sym)
             : CreateScipSymbol(sym.ContainingSymbol);

@@ -49,7 +49,7 @@ public class ScipSymbol
 
     private static string EscapedName(SymbolDescriptor desc)
     {
-        if (desc.Name == null)
+        if (desc.Name == null || desc.Name.Length == 0)
         {
             return "";
         }
